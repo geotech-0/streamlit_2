@@ -1,4 +1,4 @@
-# app.py (Optimized & Slice & Colorbar Fix)
+# app.py (Optimized & Slice Toggle + Single Slice)
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -48,7 +48,8 @@ z_min, z_max = float(Z.min()), float(Z.max())
 # 2. 사이드바 컨트롤
 render_modes = ['None', 'Volume', 'Isosurface']
 render_mode = st.sidebar.selectbox("렌더링 모드 선택", render_modes, index=0)
-z_sel      = st.sidebar.slider(
+show_slice   = st.sidebar.checkbox("단면 표시", value=True)
+z_sel        = st.sidebar.slider(
     "단면 Z 높이 (m)",
     z_min, z_max,
     (z_min + z_max) / 2.0
@@ -96,21 +97,22 @@ elif render_mode == 'Isosurface':
         )
     )
 
-# 4.2 단면 Surface (colorbar 추가)
-idx = int((np.abs(zi - z_sel)).argmin())
-z_plane = zi[idx]
-slice_val = gv[:,:,idx]
-traces.append(
-    go.Surface(
-        x=xi, y=yi, z=np.full_like(slice_val, z_plane),
-        surfacecolor=slice_val,
-        cmin=np.nanmin(gv), cmax=np.nanmax(gv),
-        showscale=True,
-        colorbar=dict(title='SPT N', len=0.5, y=0.7),
-        opacity=0.8,
-        name=f"Slice Z={z_plane:.2f}"
+# 4.2 단면 Surface (옵션)
+if show_slice:
+    idx = int((np.abs(zi - z_sel)).argmin())
+    z_plane = zi[idx]
+    slice_val = gv[:,:,idx]
+    traces.append(
+        go.Surface(
+            x=xi, y=yi, z=np.full_like(slice_val, z_plane),
+            surfacecolor=slice_val,
+            cmin=np.nanmin(gv), cmax=np.nanmax(gv),
+            showscale=True,
+            colorbar=dict(title='SPT N', len=0.5, y=0.7),
+            opacity=0.8,
+            name=f"Slice Z={z_plane:.2f}"
+        )
     )
-)
 
 # 4.3 말뚝 원통
 theta = np.linspace(0, 2*np.pi, 16)
