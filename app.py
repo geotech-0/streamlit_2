@@ -1,4 +1,4 @@
-# app.py (Optimized & Fixed Z Slider)
+# app.py (Optimized & Fixed Z Slider + Borehole Fix)
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -127,9 +127,9 @@ for x0, y0, zt in zip(Xp, Yp, Zp):
         )
     )
 
-# 4.4 보어홀 원통
+# 4.4 보어홀 원통 (수정)
 for bh, grp in df_pts.groupby('BH'):
-    x0, y0, ztop = grp[['X','top_z']].iloc[0]
+    x0, y0, ztop = grp[['X','Y','top_z']].iloc[0]
     zbot = grp['Z'].min()
     zc = np.array([zbot, ztop])
     th, zgr = np.meshgrid(theta, zc)
