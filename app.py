@@ -1,4 +1,4 @@
-# app.py (Optimized & Fixed Z Slider + Borehole Fix)
+# app.py (Optimized & Slice & Colorbar Fix)
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -46,7 +46,8 @@ Xp, Yp, Zp    = df_pile[['X','Y','상단높이(m)']].values.T
 z_min, z_max = float(Z.min()), float(Z.max())
 
 # 2. 사이드바 컨트롤
-use_volume = st.sidebar.checkbox("볼륨 렌더링 사용", value=False)
+render_modes = ['None', 'Volume', 'Isosurface']
+render_mode = st.sidebar.selectbox("렌더링 모드 선택", render_modes, index=0)
 z_sel      = st.sidebar.slider(
     "단면 Z 높이 (m)",
     z_min, z_max,
@@ -71,8 +72,8 @@ xi, yi, zi, gx, gy, gz, gv = build_grid(X, Y, Z, SPT)
 # 4. 3D Figure 생성
 traces = []
 
-# 4.1 볼륨 또는 아이소서페이스
-if use_volume:
+# 4.1 렌더링 모드
+if render_mode == 'Volume':
     traces.append(
         go.Volume(
             x=gx.ravel(), y=gy.ravel(), z=gz.ravel(), value=gv.ravel(),
@@ -82,7 +83,7 @@ if use_volume:
             name='SPT Volume'
         )
     )
-else:
+elif render_mode == 'Isosurface':
     traces.append(
         go.Isosurface(
             x=gx.ravel(), y=gy.ravel(), z=gz.ravel(), value=gv.ravel(),
@@ -95,7 +96,7 @@ else:
         )
     )
 
-# 4.2 단면 Surface
+# 4.2 단면 Surface (colorbar 추가)
 idx = int((np.abs(zi - z_sel)).argmin())
 z_plane = zi[idx]
 slice_val = gv[:,:,idx]
@@ -104,12 +105,14 @@ traces.append(
         x=xi, y=yi, z=np.full_like(slice_val, z_plane),
         surfacecolor=slice_val,
         cmin=np.nanmin(gv), cmax=np.nanmax(gv),
-        showscale=False, opacity=0.8,
+        showscale=True,
+        colorbar=dict(title='SPT N', len=0.5, y=0.7),
+        opacity=0.8,
         name=f"Slice Z={z_plane:.2f}"
     )
 )
 
-# 4.3 말뚝 원통 (저해상도)
+# 4.3 말뚝 원통
 theta = np.linspace(0, 2*np.pi, 16)
 for x0, y0, zt in zip(Xp, Yp, Zp):
     zc = np.array([pile_bot, zt])
@@ -121,13 +124,13 @@ for x0, y0, zt in zip(Xp, Yp, Zp):
             z=zgr.T,
             showscale=False,
             opacity=0.5,
-            surfacecolor=zgr.T*0 + 1,
+            surfacecolor=zgr.T*0,
             colorscale=[[0,'red'],[1,'red']],
             name='Pile'
         )
     )
 
-# 4.4 보어홀 원통 (수정)
+# 4.4 보어홀 원통
 for bh, grp in df_pts.groupby('BH'):
     x0, y0, ztop = grp[['X','Y','top_z']].iloc[0]
     zbot = grp['Z'].min()
@@ -140,7 +143,7 @@ for bh, grp in df_pts.groupby('BH'):
             z=zgr.T,
             showscale=False,
             opacity=0.3,
-            surfacecolor=zgr.T*0 + 1,
+            surfacecolor=zgr.T*0,
             colorscale=[[0,'gray'],[1,'gray']],
             name='Borehole'
         )
