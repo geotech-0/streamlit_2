@@ -1,2 +1,6 @@
-streamlit
-pandas scipy numpy plotly openpyxl
+streamlit==1.46.0
+pandas
+numpy
+scipy==1.15.3
+plotly
+openpyxl
