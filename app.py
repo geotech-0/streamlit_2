@@ -1,4 +1,4 @@
-# app.py (Optimized & Borehole Top Surface Fix)
+# app.py (Optimized & Single Legend Fix)
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -21,7 +21,7 @@ def load_and_prepare(buffer):
     df_loc      = pd.read_excel(buffer, sheet_name='시추주상도 위치')
     df_info_raw = pd.read_excel(buffer, sheet_name='시추주상도 정보', header=0)
     df_pile     = pd.read_excel(buffer, sheet_name='말뚝 정보')
-    df_info = df_info_raw.drop(index=0).apply(pd.to_numeric, errors='coerce').reset_index(drop=True)
+    df_info     = df_info_raw.drop(index=0).apply(pd.to_numeric, errors='coerce').reset_index(drop=True)
     pts = []
     for col in df_info.columns:
         if '.1' in col: continue
@@ -39,12 +39,11 @@ df_pts, df_pile = load_and_prepare(uploaded)
 X, Y, Z, SPT = df_pts[['X','Y','Z','SPT']].values.T
 Xp, Yp, Zp    = df_pile[['X','Y','상단높이(m)']].values.T
 
-# 2D Top surface interpolation (cache) using borehole tops
+# 2D Top surface interpolation (cache)
 @st.cache_data(show_spinner=False)
 def build_top_surface(xp, yp, zp, xi, yi):
     grid_x2, grid_y2 = np.meshgrid(xi, yi, indexing='xy')
-    grid_z2 = griddata((xp, yp), zp, (grid_x2, grid_y2), method='linear')
-    return grid_z2
+    return griddata((xp, yp), zp, (grid_x2, grid_y2), method='linear')
 
 # 2. 실제 Z 범위
 z_min, z_max = float(Z.min()), float(Z.max())
@@ -69,25 +68,24 @@ def build_grid(x, y, z, val, nx=30, ny=30, nz=15):
     return xi, yi, zi, gx, gy, gz, gv
 
 xi, yi, zi, gx, gy, gz, gv = build_grid(X, Y, Z, SPT)
-# borehole top coordinates
+# 보어홀 최상단
 df_bh_tops = df_pts.groupby('BH')[['X','Y','top_z']].first().reset_index(drop=True)
-xb = df_bh_tops['X'].values
-yb = df_bh_tops['Y'].values
-zb = df_bh_tops['top_z'].values
+xb, yb, zb = df_bh_tops['X'].values, df_bh_tops['Y'].values, df_bh_tops['top_z'].values
 top_surface = build_top_surface(xb, yb, zb, xi, yi)
 
 # 5. 3D Figure 생성
 traces = []
 
-# 5.1 Volume 렌더링
+# 5.1 Volume 렌더링 (colorbar hidden)
 if render_mode == 'Volume':
     traces.append(go.Volume(
         x=gx.ravel(), y=gy.ravel(), z=gz.ravel(), value=gv.ravel(),
         isomin=np.nanpercentile(gv,10), isomax=np.nanpercentile(gv,90),
-        opacity=0.05, surface_count=10, colorscale='Viridis', name='SPT Volume'
+        opacity=0.05, surface_count=10, colorscale='Viridis',
+        showscale=False, name='SPT Volume'
     ))
 
-# 5.2 Top Surface 연결 (시추공 최상단)
+# 5.2 Top Surface 연결
 elif render_mode == 'Top Surface':
     traces.append(go.Surface(
         x=xi, y=yi, z=top_surface,
