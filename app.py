@@ -74,13 +74,17 @@ xb, yb, zb = df_bh_tops['X'].values, df_bh_tops['Y'].values, df_bh_tops['top_z']
 top_surface = build_top_surface(xb, yb, zb, xi, yi)
 
 # 5. 3D Figure 생성
+# Compute global color scale based on volume
+vmin = np.nanpercentile(gv, 10)
+vmax = np.nanpercentile(gv, 90)
+
 traces = []
 
 # 5.1 Volume 렌더링 (colorbar hidden)
 if render_mode == 'Volume':
     traces.append(go.Volume(
         x=gx.ravel(), y=gy.ravel(), z=gz.ravel(), value=gv.ravel(),
-        isomin=np.nanpercentile(gv,10), isomax=np.nanpercentile(gv,90),
+        isomin=vmin, isomax=vmax,
         opacity=0.05, surface_count=10, colorscale='Viridis',
         showscale=False, name='SPT Volume'
     ))
@@ -100,7 +104,7 @@ if show_slice:
     slice_val = gv[:,:,idx]
     traces.append(go.Surface(
         x=xi, y=yi, z=np.full_like(slice_val, z_plane),
-        surfacecolor=slice_val, cmin=np.nanmin(gv), cmax=np.nanmax(gv),
+        surfacecolor=slice_val, cmin=vmin, cmax=vmax,
         showscale=True, colorbar=dict(title='SPT N', len=0.5, y=0.7), opacity=0.8,
         name=f"Slice Z={z_plane:.2f}"
     ))
