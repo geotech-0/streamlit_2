@@ -22,7 +22,7 @@ def load_data(file_buffer):
     df_loc      = pd.read_excel(file_buffer, sheet_name='시추주상도 위치')
     df_info_raw = pd.read_excel(file_buffer, sheet_name='시추주상도 정보', header=0)
     df_pile     = pd.read_excel(file_buffer, sheet_name='말뚝 정보')
-    # 정보 시트 전처리
+    # 시추정보 전처리
     df_info = df_info_raw.drop(index=0).apply(pd.to_numeric, errors='coerce').reset_index(drop=True)
     pts = []
     for col in df_info.columns:
@@ -53,21 +53,34 @@ def make_grid(x, y, z, val, nx=50, ny=50, nz=25):
 
 xi, yi, zi, gx, gy, gz, gv = make_grid(X, Y, Z, SPT)
 
-# 3. 사이드바: Z 슬라이스 선택
+# 3. 사이드바 컨트롤
 z_sel = st.sidebar.slider(
     "단면 Z 높이 선택 (m)",
     float(Z.min()), float(Z.max()),
     float((Z.min()+Z.max())/2)
 )
+pile_radius = st.sidebar.number_input(
+    "말뚝 반경 설정 (m)", 
+    min_value=0.01, max_value=5.0, value=0.2, step=0.01
+)
+pile_bottom = st.sidebar.number_input(
+    "말뚝 하단 높이 (m)", 
+    min_value=float(Z.min()), max_value=float(Z.max()), 
+    value=float(Z.min())
+)
 
 # 4. Plotly 3D + Slice
+# 4.1 Volume 렌더링
 vol = go.Volume(
     x=gx.flatten(), y=gy.flatten(), z=gz.flatten(),
     value=gv.flatten(),
     isomin=np.nanpercentile(gv, 5),
     isomax=np.nanpercentile(gv, 95),
-    opacity=0.1, surface_count=15, colorscale='Viridis'
+    opacity=0.1, surface_count=15, colorscale='Viridis',
+    name='SPT Volume'
 )
+
+# 4.2 선택 Z의 단면 Surface
 idx = int(np.abs(zi - z_sel).argmin())
 slice_val = gv[:, :, idx]
 slice_surf = go.Surface(
@@ -76,23 +89,47 @@ slice_surf = go.Surface(
     surfacecolor=slice_val,
     colorscale='Viridis',
     cmin=np.nanmin(gv), cmax=np.nanmax(gv),
-    showscale=False
+    showscale=False,
+    name=f"Slice Z≈{zi[idx]:.2f}"
 )
+
+# 4.3 시추공 점
 pts3d = go.Scatter3d(
     x=X, y=Y, z=Z,
     mode='markers',
-    marker=dict(size=3, color=SPT, colorscale='Viridis')
-)
-piles3d = go.Scatter3d(
-    x=Xp, y=Yp, z=Zp,
-    mode='markers',
-    marker=dict(size=5, symbol='diamond', color='red')
+    marker=dict(size=3, color=SPT, colorscale='Viridis'),
+    name='Borehole SPT'
 )
 
-fig = go.Figure(data=[vol, slice_surf, pts3d, piles3d])
+# 4.4 말뚝 원통 생성
+cylinder_traces = []
+theta = np.linspace(0, 2*np.pi, 30)
+for x0, y0, z_top in zip(Xp, Yp, Zp):
+    z_cyl = np.linspace(pile_bottom, z_top, 2)
+    theta_grid, z_grid = np.meshgrid(theta, z_cyl)
+    x_grid = x0 + pile_radius * np.cos(theta_grid)
+    y_grid = y0 + pile_radius * np.sin(theta_grid)
+    # Surface mesh for cylinder
+    cyl = go.Surface(
+        x=x_grid.T, y=y_grid.T, z=z_grid.T,
+        showscale=False,
+        surfacecolor=np.full_like(z_grid.T, zi[idx]),  # 단색
+        colorscale=[[0, 'red'], [1, 'red']],
+        opacity=0.6,
+        name='Pile'
+    )
+    cylinder_traces.append(cyl)
+
+# 4.5 Figure 조립
+fig = go.Figure(data=[vol, slice_surf, pts3d] + cylinder_traces)
 fig.update_layout(
-    scene=dict(xaxis_title='X (m)', yaxis_title='Y (m)', zaxis_title='Elevation (m)'),
-    height=700, margin=dict(r=10, l=10, b=10, t=50)
+    scene=dict(
+        xaxis_title='X (m)',
+        yaxis_title='Y (m)',
+        zaxis_title='Elevation (m)'
+    ),
+    height=700,
+    margin=dict(r=10, l=10, b=10, t=50)
 )
 
 st.plotly_chart(fig, use_container_width=True)
