@@ -1,2 +1,2 @@
 streamlit
-scipy
+pandas scipy numpy plotly openpyxl
