@@ -1,4 +1,4 @@
-# app.py (Optimized & Top Surface Isosurface)
+# app.py (Optimized & Borehole Top Surface Fix)
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -39,7 +39,7 @@ df_pts, df_pile = load_and_prepare(uploaded)
 X, Y, Z, SPT = df_pts[['X','Y','Z','SPT']].values.T
 Xp, Yp, Zp    = df_pile[['X','Y','상단높이(m)']].values.T
 
-# 2D Top surface interpolation (cache)
+# 2D Top surface interpolation (cache) using borehole tops
 @st.cache_data(show_spinner=False)
 def build_top_surface(xp, yp, zp, xi, yi):
     grid_x2, grid_y2 = np.meshgrid(xi, yi, indexing='xy')
@@ -69,7 +69,12 @@ def build_grid(x, y, z, val, nx=30, ny=30, nz=15):
     return xi, yi, zi, gx, gy, gz, gv
 
 xi, yi, zi, gx, gy, gz, gv = build_grid(X, Y, Z, SPT)
-top_surface = build_top_surface(Xp, Yp, Zp, xi, yi)
+# borehole top coordinates
+df_bh_tops = df_pts.groupby('BH')[['X','Y','top_z']].first().reset_index(drop=True)
+xb = df_bh_tops['X'].values
+yb = df_bh_tops['Y'].values
+zb = df_bh_tops['top_z'].values
+top_surface = build_top_surface(xb, yb, zb, xi, yi)
 
 # 5. 3D Figure 생성
 traces = []
